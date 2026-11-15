@@ -163,7 +163,13 @@ nav.tabs button[aria-current="page"] { color: var(--yellow); }
   height: 96px; border-radius: 18px; border: 1px dashed var(--line); background: var(--bg) center / cover no-repeat;
   display: grid; place-items: center; color: var(--muted); font-size: 14px; position: relative; overflow: hidden;
 }
-.preview.filled { border: 0; }
+.preview.filled { border: 0; cursor: grab; touch-action: none; background-repeat: no-repeat; user-select: none; -webkit-user-select: none; }
+.preview.filled:active { cursor: grabbing; }
+.preview.frame { height: auto; aspect-ratio: 3.4 / 1; width: 100%; max-width: 100%; }
+.zoom-row { display: flex; align-items: center; gap: 12px; }
+.zoom-row svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
+.zoom-row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--yellow); height: 28px; }
+.adjust { display: flex; flex-direction: column; gap: 8px; }
 .toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; cursor: pointer; }
 .field > .toggle { text-transform: none; letter-spacing: normal; font-size: 15px; color: var(--fg); position: relative; }
 .toggle .note { display: block; margin-top: 2px; }
@@ -304,7 +310,7 @@ nav.tabs button[aria-current="page"] { color: var(--yellow); }
     return new Promise((res, rej) => {
       const url = URL.createObjectURL(file); const img = new Image();
       img.onload = () => {
-        const max = 1400; const s = Math.min(1, max / Math.max(img.width, img.height));
+        const max = 2000; const s = Math.min(1, max / Math.max(img.width, img.height));
         const cv = document.createElement("canvas"); cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
         cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height); URL.revokeObjectURL(url);
         res(cv.toDataURL("image/jpeg", .82));
@@ -413,7 +419,16 @@ nav.tabs button[aria-current="page"] { color: var(--yellow); }
           <label class="sw-custom ${isCustom ? "on" : ""}" id="swCustomWrap" title="Pick any colour" ${isCustom ? `style="background:${esc(it.color)}"` : ""}>${isCustom ? "" : "+"}<input type="color" id="fColor" value="${esc(isCustom ? it.color : "#f7dd52")}" aria-label="Pick any colour"></label>
         </div></div>
       <div class="field"><span class="lbl">Background photo</span>
-        <div class="preview ${it.bg ? "filled" : ""}" id="pv" ${it.bg ? `style="background-image:${bgLayers(it.bg, it.dim, false)}"` : ""}>${it.bg ? "" : "No photo yet"}</div>
+        <div class="preview frame" id="pv" aria-label="Photo position. Drag to move it.">No photo yet</div>
+        <div class="adjust" id="adjust" hidden>
+          <span class="note">Drag the photo to move it. Pinch or use the slider to zoom.</span>
+          <div class="zoom-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M8 11h6M20 20l-4.5-4.5"/></svg>
+            <input type="range" id="fZoom" min="1" max="4" step="0.01" value="1" aria-label="Zoom">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M7.5 11h7M11 7.5v7M20 20l-4 -4"/></svg>
+          </div>
+          <div class="row"><button type="button" class="btn" id="recentre">Reset position</button></div>
+        </div>
         <div class="row">
           <label class="btn blue" for="fFile" style="cursor:pointer">${it.bg ? "Change photo" : "Choose from camera roll"}</label>
           <input type="file" id="fFile" accept="image/*" hidden>
@@ -442,24 +457,78 @@ nav.tabs button[aria-current="page"] { color: var(--yellow); }
     $("sw").addEventListener("click", e => { const b = e.target.closest(".sw"); if (b) setColor(b.dataset.c); });
     $("fColor").addEventListener("input", e => setColor(e.target.value.toLowerCase()));
 
-    const setBg = bg => {
-      it.bg = bg; const pv = $("pv");
-      pv.classList.toggle("filled", !!bg); pv.style.backgroundImage = bg ? bgLayers(bg, it.dim, false) : ""; pv.textContent = bg ? "" : "No photo yet";
-      document.querySelector('label[for="fFile"]').textContent = bg ? "Change photo" : "Choose from camera roll";
+    // ----- photo framing: drag to move, pinch or slider to zoom -----
+    if (it.bg && !it.orig) it.orig = it.bg;           // older countdowns: their photo becomes the original
+    let crop = it.crop ? { ...it.crop } : { cx: .5, cy: .5, z: 1 };
+    let photo = null;                                  // loaded Image of it.orig
+    const pv = $("pv");
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    function geom(Fw, Fh) {
+      const W = photo.naturalWidth, H = photo.naturalHeight;
+      const sc = Math.max(Fw / W, Fh / H) * crop.z, dw = W * sc, dh = H * sc;
+      const ox = clamp(Fw / 2 - crop.cx * dw, Fw - dw, 0), oy = clamp(Fh / 2 - crop.cy * dh, Fh - dh, 0);
+      crop.cx = (Fw / 2 - ox) / dw; crop.cy = (Fh / 2 - oy) / dh;
+      return { sc, dw, dh, ox, oy };
+    }
+    function drawPreview() {
+      const has = !!(it.orig && photo);
+      pv.classList.toggle("filled", has); $("adjust").hidden = !has; $("dimRow").hidden = !it.orig;
+      if (!has) { pv.style.backgroundImage = ""; pv.textContent = it.orig ? "Loading photo…" : "No photo yet"; return; }
+      pv.textContent = "";
+      const g = geom(pv.clientWidth, pv.clientHeight);
+      pv.style.backgroundImage = (it.dim ? DIM + ", " : "") + `url('${it.orig}')`;
+      pv.style.backgroundSize = (it.dim ? "100% 100%, " : "") + `${g.dw}px ${g.dh}px`;
+      pv.style.backgroundPosition = (it.dim ? "0 0, " : "") + `${g.ox}px ${g.oy}px`;
+      $("fZoom").value = crop.z;
+    }
+    function loadPhoto() {
+      photo = null; drawPreview(); if (!it.orig) return;
+      const img = new Image(); img.onload = () => { if (img.src === it.orig) { photo = img; requestAnimationFrame(drawPreview); } }; img.src = it.orig;
+    }
+    function cropToData() {
+      const OW = 1200, OH = Math.round(OW / 3.4), g = geom(OW, OH);
+      const cv = document.createElement("canvas"); cv.width = OW; cv.height = OH;
+      cv.getContext("2d").drawImage(photo, -g.ox / g.sc, -g.oy / g.sc, OW / g.sc, OH / g.sc, 0, 0, OW, OH);
+      return cv.toDataURL("image/jpeg", .85);
+    }
+    const setPhoto = orig => {
+      it.orig = orig; crop = { cx: .5, cy: .5, z: 1 };
+      document.querySelector('label[for="fFile"]').textContent = orig ? "Change photo" : "Choose from camera roll";
       const rm = $("rmPhoto");
-      if (bg && !rm) { const b = document.createElement("button"); b.type = "button"; b.className = "btn"; b.id = "rmPhoto"; b.textContent = "Remove photo"; b.onclick = () => setBg(null); document.querySelector('label[for="fFile"]').parentNode.appendChild(b); }
-      if (!bg && rm) rm.remove();
-      $("dimRow").hidden = !bg;
+      if (orig && !rm) { const b = document.createElement("button"); b.type = "button"; b.className = "btn"; b.id = "rmPhoto"; b.textContent = "Remove photo"; b.onclick = () => setPhoto(null); document.querySelector('label[for="fFile"]').parentNode.appendChild(b); }
+      if (!orig && rm) rm.remove();
+      loadPhoto();
     };
-    $("fDim").addEventListener("change", e => { it.dim = e.target.checked; if (it.bg) $("pv").style.backgroundImage = bgLayers(it.bg, it.dim, false); });
-    if ($("rmPhoto")) $("rmPhoto").onclick = () => setBg(null);
+    // pointer handling (one finger drags, two fingers pinch)
+    const pts = new Map(); let pinch0 = null;
+    pv.addEventListener("pointerdown", e => { if (!photo) return; pv.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); pinch0 = null; });
+    pv.addEventListener("pointermove", e => {
+      if (!photo || !pts.has(e.pointerId)) return;
+      const prev = pts.get(e.pointerId); const cur = { x: e.clientX, y: e.clientY }; pts.set(e.pointerId, cur);
+      if (pts.size === 1) {
+        const g = geom(pv.clientWidth, pv.clientHeight);
+        crop.cx -= (cur.x - prev.x) / g.dw; crop.cy -= (cur.y - prev.y) / g.dh;
+      } else if (pts.size === 2) {
+        const [a, b] = [...pts.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (!pinch0) pinch0 = { d, z: crop.z }; else crop.z = clamp(pinch0.z * d / pinch0.d, 1, 4);
+      }
+      drawPreview();
+    });
+    const up = e => { pts.delete(e.pointerId); pinch0 = null; };
+    pv.addEventListener("pointerup", up); pv.addEventListener("pointercancel", up);
+    pv.addEventListener("wheel", e => { if (!photo) return; e.preventDefault(); crop.z = clamp(crop.z * (e.deltaY < 0 ? 1.06 : 1 / 1.06), 1, 4); drawPreview(); }, { passive: false });
+    $("fZoom").addEventListener("input", e => { crop.z = +e.target.value; drawPreview(); });
+    $("recentre").onclick = () => { crop = { cx: .5, cy: .5, z: 1 }; drawPreview(); };
+    $("fDim").addEventListener("change", e => { it.dim = e.target.checked; drawPreview(); });
+    if ($("rmPhoto")) $("rmPhoto").onclick = () => setPhoto(null);
     $("fFile").addEventListener("change", async e => {
       const f = e.target.files && e.target.files[0]; if (!f) return;
       $("fileNote").textContent = "Loading photo…";
-      try { setBg(await readImage(f)); $("fileNote").textContent = ""; }
+      try { setPhoto(await readImage(f)); $("fileNote").textContent = ""; }
       catch (err) { $("fileNote").textContent = err.message; }
       e.target.value = "";
     });
+    loadPhoto();
 
     if (existing) {
       let armed = false;
@@ -475,6 +544,8 @@ nav.tabs button[aria-current="page"] { color: var(--yellow); }
       if (!it.title) { $("fErr").textContent = "Give it a name so you know what you're counting down to."; $("fTitle").focus(); return; }
       if (!/^\d{4}-\d{2}-\d{2}$/.test(it.date)) { $("fErr").textContent = "Pick a date for it."; $("fDate").focus(); return; }
       delete it.example;
+      if (it.orig && photo) { it.bg = cropToData(); it.crop = crop; }
+      else if (!it.orig) { it.bg = null; delete it.crop; }
       await save(it);
       const idx = items.findIndex(x => x.id === it.id); if (idx >= 0) items[idx] = it; else items.push(it);
       close();
