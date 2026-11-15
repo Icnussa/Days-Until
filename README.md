@@ -2,7 +2,7 @@
 
 A countdown app for the things you're waiting for. Add something with a date and it shows how many days are left, soonest first. Each countdown can have a photo background from your camera roll (with an optional darken switch), and a calendar view shows a coloured dot on every day that has something.
 
-Live at **https://icnussa.github.io/days-until/**
+Live at **https://icnussa.github.io/Days-Until/**
 
 ## Install it on your phone
 
