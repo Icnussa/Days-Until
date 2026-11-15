@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Days Until</title>
+<meta name="description" content="Count down the days to the things you're waiting for.">
+<meta name="theme-color" content="#1c1e22">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Days Until">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: one-column phone app. Stacked countdown "tickets" on Home, month grid on Calendar, bottom tab bar. Charcoal base, light blue + electric yellow accents. */
+:root {
+  --bg: #1c1e22;
+  --surface: #26292f;
+  --surface-2: #30343b;
+  --line: #3a3f47;
+  --fg: #eef1f5;
+  --muted: #9aa3ae;
+  --blue: #02b5e9;
+  --yellow: #f7dd52;
+  --on-yellow: #17181b;
+  --danger: #ff7a7a;
+  --display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r-card: 22px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px;
+  -webkit-tap-highlight-color: transparent;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.app {
+  max-width: 560px; margin: 0 auto; min-height: 100%;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 8px calc(96px + env(safe-area-inset-bottom, 0px));
+}
+header.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding-block: 14px 12px;
+}
+.brand { font-family: var(--display); font-weight: 800; font-size: 30px; letter-spacing: -0.02em; line-height: 1; margin: 0; }
+.brand span { color: var(--yellow); }
+.today { color: var(--muted); font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; }
+
+/* Countdown list */
+.list { display: flex; flex-direction: column; gap: 12px; }
+.section-label { color: var(--muted); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; margin: 18px 2px 2px; }
+.card {
+  position: relative; display: flex; align-items: center; gap: 14px; width: 100%; min-height: 104px;
+  border: 1px solid var(--line); border-radius: var(--r-card); padding: 16px 18px; text-align: left;
+  background: var(--surface) center / cover no-repeat; overflow: hidden; isolation: isolate;
+  transition: transform .15s ease;
+}
+.card:active { transform: scale(.985); }
+.card.has-bg { border: 0; padding: 17px 19px; }
+.card .meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.card .title { font-family: var(--display); font-weight: 700; font-size: 20px; line-height: 1.15; overflow-wrap: anywhere; text-wrap: balance; }
+.card .date { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.card.has-bg .date { color: #d5dae1; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px rgba(0,0,0,.25); }
+.count { text-align: right; flex: none; display: flex; flex-direction: column; align-items: flex-end; }
+.count .n { font-family: var(--display); font-weight: 800; font-size: 46px; line-height: .9; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--blue); }
+.count .u { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+.card.has-bg .count .u { color: #d5dae1; }
+.card.soon .count .n { color: var(--yellow); }
+.card.today-card .count .n { color: var(--yellow); font-size: 30px; }
+.card.past { opacity: .62; }
+.card.past .count .n { color: var(--muted); font-size: 30px; }
+.example-tag { margin-left: 4px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; background: rgba(0,0,0,.45); color: #d5dae1; padding: 2px 7px; border-radius: 99px; }
+
+.banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--surface); border: 1px dashed var(--line); border-radius: 16px; padding: 12px 14px; margin-bottom: 12px; color: var(--muted); font-size: 13px; }
+.banner button { background: none; border: 1px solid var(--line); border-radius: 99px; padding: 6px 12px; color: var(--fg); font-size: 13px; white-space: nowrap; }
+
+.empty { text-align: center; padding: 56px 12px; color: var(--muted); }
+.empty h2 { font-family: var(--display); color: var(--fg); font-size: 22px; margin: 0 0 8px; }
+
+/* FAB */
+.fab {
+  position: fixed; z-index: 6; right: max(20px, calc(env(safe-area-inset-right, 0px) + 16px));
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  width: 60px; height: 60px; border-radius: 50%; border: 0; background: var(--yellow); color: var(--on-yellow);
+  font-size: 32px; line-height: 1; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,.45);
+  display: grid; place-items: center;
+}
+@media (min-width: 600px) { .fab { right: calc(50% - 280px + 16px); } }
+
+/* Tab bar */
+nav.tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 7; background: rgba(28,30,34,.94); backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line);
+  padding: 8px max(16px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+nav.tabs .inner { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+nav.tabs button { background: none; border: 0; border-radius: 14px; padding: 8px; display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--muted); font-size: 12px; font-weight: 500; }
+nav.tabs button svg { width: 24px; height: 24px; }
+nav.tabs button[aria-current="page"] { color: var(--yellow); }
+
+/* Calendar */
+.cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0 14px; }
+.cal-head h2 { font-family: var(--display); font-weight: 700; font-size: 22px; margin: 0; }
+.cal-head h2 span { color: var(--muted); font-weight: 500; }
+.icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; }
+.icon-btn svg { width: 20px; height: 20px; }
+.grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.dow { text-align: center; font-size: 11px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; padding-bottom: 6px; }
+.day {
+  aspect-ratio: 1 / 1.08; max-width: 100%; border: 0; border-radius: 12px; background: var(--surface);
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 4px; padding-top: 8px;
+  font-variant-numeric: tabular-nums; font-size: 14px;
+}
+.day.out { background: transparent; color: #5b626c; }
+.day.is-today { box-shadow: inset 0 0 0 2px var(--blue); color: var(--blue); font-weight: 600; }
+.day.sel { background: var(--surface-2); box-shadow: inset 0 0 0 2px var(--yellow); }
+.day .dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; max-width: 30px; }
+.day .dots i { width: 7px; height: 7px; border-radius: 50%; display: block; }
+.day-list { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
+.day-list h3 { margin: 0 2px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.day-list .none { color: var(--muted); padding: 4px 2px; }
+
+/* Sheet */
+.scrim { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.55); display: flex; align-items: flex-end; justify-content: center; }
+.sheet {
+  width: 100%; max-width: 560px; max-height: 92%; overflow-y: auto; background: var(--surface); border-radius: 26px 26px 0 0;
+  padding: 10px max(18px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(18px, env(safe-area-inset-left, 0px));
+  animation: up .22s ease-out;
+}
+@keyframes up { from { transform: translateY(30px); opacity: .6; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sheet { animation: none; } .card { transition: none; } }
+.grabber { width: 40px; height: 5px; border-radius: 99px; background: var(--line); margin: 0 auto 12px; }
+.sheet h2 { font-family: var(--display); font-size: 22px; margin: 0 0 14px; }
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.field > label, .field > .lbl { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.field input[type="text"], .field input[type="date"] {
+  width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 13px 14px; font-size: 16px; min-height: 50px;
+}
+.field input:focus { outline: none; border-color: var(--blue); }
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.sw { width: 34px; height: 34px; border-radius: 50%; border: 2px solid transparent; padding: 0; }
+.sw[aria-pressed="true"] { border-color: var(--fg); box-shadow: 0 0 0 3px var(--bg) inset; }
+.sw-custom { position: relative; width: 34px; height: 34px; border-radius: 50%; overflow: hidden; border: 2px dashed var(--muted); display: grid; place-items: center; font-size: 18px; color: var(--muted); }
+.sw-custom input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+.sw-custom.on { border-style: solid; border-color: var(--fg); }
+.preview {
+  height: 96px; border-radius: 18px; border: 1px dashed var(--line); background: var(--bg) center / cover no-repeat;
+  display: grid; place-items: center; color: var(--muted); font-size: 14px; position: relative; overflow: hidden;
+}
+.preview.filled { border: 0; }
+.toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; cursor: pointer; }
+.field > .toggle { text-transform: none; letter-spacing: normal; font-size: 15px; color: var(--fg); position: relative; }
+.toggle .note { display: block; margin-top: 2px; }
+.toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.toggle .track { width: 46px; height: 28px; border-radius: 99px; background: var(--surface-2); border: 1px solid var(--line); position: relative; flex: none; transition: background .15s; }
+.toggle .track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--muted); transition: transform .15s, background .15s; }
+.toggle input:checked + .track { background: var(--yellow); border-color: var(--yellow); }
+.toggle input:checked + .track::after { transform: translateX(18px); background: var(--on-yellow); }
+.toggle input:focus-visible + .track { outline: 2px solid var(--blue); outline-offset: 2px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn { border: 1px solid var(--line); background: var(--surface-2); border-radius: 99px; padding: 11px 16px; font-weight: 500; font-size: 14px; }
+.btn.primary { background: var(--yellow); color: var(--on-yellow); border-color: var(--yellow); font-weight: 600; }
+.btn.blue { background: transparent; border-color: var(--blue); color: var(--blue); }
+.btn.danger { background: transparent; border-color: var(--danger); color: var(--danger); }
+.btn.danger.armed { background: var(--danger); color: var(--on-yellow); }
+.actions { display: flex; gap: 10px; justify-content: space-between; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+.actions .grow { display: flex; gap: 10px; margin-left: auto; }
+.err { color: var(--danger); font-size: 13px; min-height: 18px; margin: -6px 0 10px; }
+.note { color: var(--muted); font-size: 12px; }
+.toast { position: fixed; left: 50%; bottom: calc(160px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 30; background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 99px; font-size: 14px; font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1 class="brand">Days<span>.</span>Until</h1>
+    <div class="today" id="todayLabel"></div>
+  </header>
+
+  <main id="homeView">
+    <div id="banner"></div>
+    <div class="list" id="list"></div>
+  </main>
+
+  <main id="calView" hidden>
+    <div class="cal-head">
+      <button class="icon-btn" id="prevM" aria-label="Previous month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <h2 id="monthLabel"></h2>
+      <button class="icon-btn" id="nextM" aria-label="Next month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></button>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="day-list" id="dayList"></div>
+  </main>
+</div>
+
+<button class="fab" id="fab" aria-label="Add countdown">+</button>
+
+<nav class="tabs">
+  <div class="inner">
+    <button id="tabHome" aria-current="page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="5" rx="2.5"/><rect x="3" y="14" width="18" height="5" rx="2.5"/></svg>
+      Countdowns
+    </button>
+    <button id="tabCal">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/><circle cx="8.5" cy="15" r="1" fill="currentColor"/><circle cx="15.5" cy="15" r="1" fill="currentColor"/></svg>
+      Calendar
+    </button>
+  </div>
+</nav>
+
+<div id="sheetRoot"></div>
+<div id="toastRoot"></div>
+
+<script>
+(() => {
+  const COLORS = ["#f7dd52", "#02b5e9", "#ff7ab6", "#7dffb2", "#ffa94d", "#b69cff", "#ff6b6b", "#ffffff"];
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const $ = id => document.getElementById(id);
+
+  // ---------- date helpers (local calendar days, DST-safe) ----------
+  const pad = n => String(n).padStart(2, "0");
+  const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parse = s => { const [y, m, d] = s.split("-").map(Number); return { y, m: m - 1, d }; };
+  const dayNum = s => { const p = parse(s); return Date.UTC(p.y, p.m, p.d) / 86400000; };
+  const todayStr = () => ymd(new Date());
+  const daysUntil = s => Math.round(dayNum(s) - dayNum(todayStr()));
+  const prettyDate = s => { const p = parse(s); return new Date(p.y, p.m, p.d).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" }); };
+  const addDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return ymd(d); };
+
+  // ---------- storage: IndexedDB with in-memory fallback ----------
+  let db = null;
+  const mem = new Map();
+  function openDB() {
+    return new Promise(res => {
+      try {
+        const r = indexedDB.open("days-until", 1);
+        r.onupgradeneeded = () => r.result.createObjectStore("items", { keyPath: "id" });
+        r.onsuccess = () => { db = r.result; res(); };
+        r.onerror = () => res();
+        r.onblocked = () => res();
+      } catch { res(); }
+    });
+  }
+  function tx(mode, fn) {
+    return new Promise(res => {
+      if (!db) return res(fn(null));
+      try {
+        const t = db.transaction("items", mode); const st = t.objectStore("items");
+        const out = fn(st); t.oncomplete = () => res(out); t.onerror = () => res(out);
+      } catch { res(fn(null)); }
+    });
+  }
+  async function loadAll() {
+    if (!db) return [...mem.values()];
+    return new Promise(res => {
+      try { const r = db.transaction("items").objectStore("items").getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => res([...mem.values()]); }
+      catch { res([...mem.values()]); }
+    });
+  }
+  const save = item => { mem.set(item.id, item); return tx("readwrite", st => st && st.put(item)); };
+  const remove = id => { mem.delete(id); return tx("readwrite", st => st && st.delete(id)); };
+  const getMeta = k => { try { return localStorage.getItem("du:" + k); } catch { return null; } };
+  const setMeta = (k, v) => { try { localStorage.setItem("du:" + k, v); } catch {} };
+
+  // ---------- example art (canvas-drawn, so nothing is fetched) ----------
+  function exampleArt(c1, c2, kind) {
+    const cv = document.createElement("canvas"); cv.width = 900; cv.height = 300; const g = cv.getContext("2d");
+    const gr = g.createLinearGradient(0, 0, 900, 300); gr.addColorStop(0, c1); gr.addColorStop(1, c2); g.fillStyle = gr; g.fillRect(0, 0, 900, 300);
+    g.globalAlpha = .18; g.fillStyle = "#fff";
+    if (kind === "film") { for (let x = 0; x < 900; x += 46) { g.fillRect(x, 14, 26, 18); g.fillRect(x, 268, 26, 18); } }
+    if (kind === "sun") { g.beginPath(); g.arc(720, 150, 110, 0, 7); g.fill(); g.globalAlpha = .1; g.beginPath(); g.arc(720, 150, 170, 0, 7); g.fill(); }
+    if (kind === "stage") { for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(450 + i * 70, 0); g.lineTo(380 + i * 110, 300); g.lineTo(460 + i * 110, 300); g.fill(); } }
+    return cv.toDataURL("image/jpeg", .8);
+  }
+  function seedExamples() {
+    const ex = [
+      { title: "New movie premiere", date: addDays(12), color: "#f7dd52", bg: exampleArt("#3a1f5c", "#0e2a47", "film") },
+      { title: "Beach trip", date: addDays(41), color: "#02b5e9", bg: exampleArt("#0d4d6b", "#e3a54a", "sun") },
+      { title: "Concert", date: addDays(3), color: "#ff7ab6", bg: exampleArt("#20142b", "#6b1d4a", "stage") },
+      { title: "Mum's birthday", date: addDays(76), color: "#7dffb2", bg: null },
+    ];
+    return Promise.all(ex.map((e, i) => save({ id: "ex" + i, example: true, created: Date.now(), ...e })));
+  }
+
+  // ---------- image import: resize for storage ----------
+  function readImage(file) {
+    return new Promise((res, rej) => {
+      const url = URL.createObjectURL(file); const img = new Image();
+      img.onload = () => {
+        const max = 1400; const s = Math.min(1, max / Math.max(img.width, img.height));
+        const cv = document.createElement("canvas"); cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
+        cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height); URL.revokeObjectURL(url);
+        res(cv.toDataURL("image/jpeg", .82));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error("That file couldn't be opened as an image. Try a JPG or PNG.")); };
+      img.src = url;
+    });
+  }
+
+  // ---------- state ----------
+  let items = [];
+  let view = "home";
+  let calY, calM, selDay = todayStr();
+
+  const sorted = () => {
+    const up = items.filter(i => daysUntil(i.date) >= 0).sort((a, b) => dayNum(a.date) - dayNum(b.date));
+    const past = items.filter(i => daysUntil(i.date) < 0).sort((a, b) => dayNum(b.date) - dayNum(a.date));
+    return { up, past };
+  };
+
+  function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+  // All shading is painted as extra layers of the same background, so it always lines up exactly with the photo.
+  const DIM = "linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.45))";
+  const SHADE = "linear-gradient(90deg, rgba(18,19,22,.88) 0%, rgba(18,19,22,.55) 55%, rgba(18,19,22,.25) 100%)";
+  function bgLayers(bg, dim, shade) { return [shade && SHADE, dim && DIM, `url('${bg}')`].filter(Boolean).join(", "); }
+
+  function cardHTML(it) {
+    const n = daysUntil(it.date);
+    let cls = "card", big, unit;
+    if (n === 0) { cls += " today-card"; big = "Today"; unit = "It's here"; }
+    else if (n < 0) { cls += " past"; big = Math.abs(n); unit = Math.abs(n) === 1 ? "day ago" : "days ago"; }
+    else { big = n; unit = n === 1 ? "day" : "days"; if (n <= 7) cls += " soon"; }
+    if (it.bg) cls += " has-bg";
+    if (it.bg && it.dim) cls += " dim";
+    const style = it.bg ? ` style="background-image:${bgLayers(it.bg, it.dim, true)}"` : "";
+    return `<button class="${cls}" data-id="${esc(it.id)}"${style}>
+      <div class="meta"><div class="title">${esc(it.title)}</div>
+        <div class="date"><span class="dot" style="background:${esc(it.color)}"></span>${prettyDate(it.date)}${it.example ? '<span class="example-tag">Example</span>' : ""}</div></div>
+      <div class="count"><div class="n">${big}</div><div class="u">${unit}</div></div>
+    </button>`;
+  }
+
+  function renderHome() {
+    const { up, past } = sorted();
+    $("banner").innerHTML = items.some(i => i.example)
+      ? `<div class="banner"><span>These are examples to show how it looks.</span><button id="clearEx">Clear examples</button></div>` : "";
+    if (!items.length) {
+      $("list").innerHTML = `<div class="empty"><h2>Nothing to wait for yet</h2><p>Tap the yellow + to add the first thing you're counting down to.</p></div>`;
+      return;
+    }
+    $("list").innerHTML = up.map(cardHTML).join("") + (past.length ? `<div class="section-label">Already happened</div>` + past.map(cardHTML).join("") : "");
+    const c = $("clearEx");
+    if (c) c.onclick = async () => { for (const i of items.filter(i => i.example)) await remove(i.id); items = items.filter(i => !i.example); render(); toast("Examples cleared"); };
+  }
+
+  function renderCal() {
+    $("monthLabel").innerHTML = `${MONTHS[calM]} <span>${calY}</span>`;
+    const first = new Date(calY, calM, 1);
+    const offset = (first.getDay() + 6) % 7; // Monday first
+    const start = new Date(calY, calM, 1 - offset);
+    const byDay = {};
+    items.forEach(i => (byDay[i.date] ||= []).push(i));
+    const today = todayStr();
+    let html = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => `<div class="dow">${d}</div>`).join("");
+    const cells = Math.ceil((offset + new Date(calY, calM + 1, 0).getDate()) / 7) * 7;
+    for (let k = 0; k < cells; k++) {
+      const d = new Date(start); d.setDate(start.getDate() + k); const s = ymd(d);
+      const ev = byDay[s] || [];
+      const cls = ["day", d.getMonth() !== calM && "out", s === today && "is-today", s === selDay && "sel"].filter(Boolean).join(" ");
+      html += `<button class="${cls}" data-day="${s}" aria-label="${prettyDate(s)}${ev.length ? ", " + ev.length + " countdown" + (ev.length > 1 ? "s" : "") : ""}">
+        ${d.getDate()}<span class="dots">${ev.slice(0, 4).map(e => `<i style="background:${esc(e.color)}"></i>`).join("")}</span></button>`;
+    }
+    $("grid").innerHTML = html;
+    const ev = (byDay[selDay] || []);
+    $("dayList").innerHTML = `<h3>${prettyDate(selDay)}</h3>` + (ev.length ? ev.map(cardHTML).join("") : `<div class="none">Nothing on this day.</div>`);
+  }
+
+  function render() {
+    const now = new Date();
+    $("todayLabel").textContent = now.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+    $("homeView").hidden = view !== "home"; $("calView").hidden = view !== "cal";
+    $("tabHome").setAttribute("aria-current", view === "home" ? "page" : "false");
+    $("tabCal").setAttribute("aria-current", view === "cal" ? "page" : "false");
+    if (view === "home") renderHome(); else renderCal();
+  }
+
+  function toast(msg) {
+    $("toastRoot").innerHTML = `<div class="toast" role="status">${esc(msg)}</div>`;
+    clearTimeout(toast.t); toast.t = setTimeout(() => $("toastRoot").innerHTML = "", 1800);
+  }
+
+  // ---------- add / edit sheet ----------
+  function openSheet(existing, presetDate) {
+    const it = existing ? { ...existing } : { id: "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), title: "", date: presetDate || addDays(7), color: COLORS[0], bg: null };
+    const isCustom = !COLORS.includes(it.color.toLowerCase());
+    $("sheetRoot").innerHTML = `<div class="scrim" id="scrim"><form class="sheet" id="form" role="dialog" aria-label="${existing ? "Edit countdown" : "Add countdown"}" novalidate>
+      <div class="grabber"></div>
+      <h2>${existing ? "Edit countdown" : "What are you waiting for?"}</h2>
+      <div class="field"><label for="fTitle">Name</label><input type="text" id="fTitle" maxlength="60" placeholder="e.g. Dune Part Three" value="${esc(it.title)}" autocomplete="off"></div>
+      <div class="field"><label for="fDate">Date</label><input type="date" id="fDate" value="${esc(it.date)}"></div>
+      <div class="err" id="fErr"></div>
+      <div class="field"><span class="lbl">Calendar dot colour</span>
+        <div class="swatches" id="sw">
+          ${COLORS.map(c => `<button type="button" class="sw" data-c="${c}" style="background:${c}" aria-label="Colour ${c}" aria-pressed="${c === it.color.toLowerCase()}"></button>`).join("")}
+          <label class="sw-custom ${isCustom ? "on" : ""}" id="swCustomWrap" title="Pick any colour" ${isCustom ? `style="background:${esc(it.color)}"` : ""}>${isCustom ? "" : "+"}<input type="color" id="fColor" value="${esc(isCustom ? it.color : "#f7dd52")}" aria-label="Pick any colour"></label>
+        </div></div>
+      <div class="field"><span class="lbl">Background photo</span>
+        <div class="preview ${it.bg ? "filled" : ""}" id="pv" ${it.bg ? `style="background-image:${bgLayers(it.bg, it.dim, false)}"` : ""}>${it.bg ? "" : "No photo yet"}</div>
+        <div class="row">
+          <label class="btn blue" for="fFile" style="cursor:pointer">${it.bg ? "Change photo" : "Choose from camera roll"}</label>
+          <input type="file" id="fFile" accept="image/*" hidden>
+          ${it.bg ? `<button type="button" class="btn" id="rmPhoto">Remove photo</button>` : ""}
+        </div>
+        <label class="toggle" id="dimRow" for="fDim" ${it.bg ? "" : "hidden"}><span>Darken photo<br><span class="note">Makes the text easier to read on bright photos</span></span><input type="checkbox" id="fDim" ${it.dim ? "checked" : ""}><span class="track"></span></label>
+        <span class="note" id="fileNote"></span>
+      </div>
+      <div class="actions">
+        ${existing ? `<button type="button" class="btn danger" id="del">Delete</button>` : ""}
+        <div class="grow"><button type="button" class="btn" id="cancel">Cancel</button><button type="submit" class="btn primary">${existing ? "Save" : "Add countdown"}</button></div>
+      </div>
+    </form></div>`;
+
+    const close = () => $("sheetRoot").innerHTML = "";
+    $("scrim").addEventListener("click", e => { if (e.target.id === "scrim") close(); });
+    $("cancel").onclick = close;
+    if (!existing) setTimeout(() => $("fTitle").focus(), 50);
+
+    const setColor = c => {
+      it.color = c;
+      document.querySelectorAll("#sw .sw").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.c === c)));
+      const w = $("swCustomWrap"), custom = !COLORS.includes(c);
+      w.classList.toggle("on", custom); w.style.background = custom ? c : ""; w.firstChild.nodeValue = custom ? "" : "+";
+    };
+    $("sw").addEventListener("click", e => { const b = e.target.closest(".sw"); if (b) setColor(b.dataset.c); });
+    $("fColor").addEventListener("input", e => setColor(e.target.value.toLowerCase()));
+
+    const setBg = bg => {
+      it.bg = bg; const pv = $("pv");
+      pv.classList.toggle("filled", !!bg); pv.style.backgroundImage = bg ? bgLayers(bg, it.dim, false) : ""; pv.textContent = bg ? "" : "No photo yet";
+      document.querySelector('label[for="fFile"]').textContent = bg ? "Change photo" : "Choose from camera roll";
+      const rm = $("rmPhoto");
+      if (bg && !rm) { const b = document.createElement("button"); b.type = "button"; b.className = "btn"; b.id = "rmPhoto"; b.textContent = "Remove photo"; b.onclick = () => setBg(null); document.querySelector('label[for="fFile"]').parentNode.appendChild(b); }
+      if (!bg && rm) rm.remove();
+      $("dimRow").hidden = !bg;
+    };
+    $("fDim").addEventListener("change", e => { it.dim = e.target.checked; if (it.bg) $("pv").style.backgroundImage = bgLayers(it.bg, it.dim, false); });
+    if ($("rmPhoto")) $("rmPhoto").onclick = () => setBg(null);
+    $("fFile").addEventListener("change", async e => {
+      const f = e.target.files && e.target.files[0]; if (!f) return;
+      $("fileNote").textContent = "Loading photo…";
+      try { setBg(await readImage(f)); $("fileNote").textContent = ""; }
+      catch (err) { $("fileNote").textContent = err.message; }
+      e.target.value = "";
+    });
+
+    if (existing) {
+      let armed = false;
+      $("del").onclick = async () => {
+        if (!armed) { armed = true; $("del").classList.add("armed"); $("del").textContent = "Tap again to delete"; return; }
+        await remove(it.id); items = items.filter(x => x.id !== it.id); close(); render(); toast("Deleted");
+      };
+    }
+
+    $("form").addEventListener("submit", async e => {
+      e.preventDefault();
+      it.title = $("fTitle").value.trim(); it.date = $("fDate").value;
+      if (!it.title) { $("fErr").textContent = "Give it a name so you know what you're counting down to."; $("fTitle").focus(); return; }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(it.date)) { $("fErr").textContent = "Pick a date for it."; $("fDate").focus(); return; }
+      delete it.example;
+      await save(it);
+      const idx = items.findIndex(x => x.id === it.id); if (idx >= 0) items[idx] = it; else items.push(it);
+      close();
+      if (view === "cal") { const p = parse(it.date); calY = p.y; calM = p.m; selDay = it.date; }
+      render();
+      const n = daysUntil(it.date);
+      toast(existing ? "Saved" : n === 0 ? "Added. It's today!" : n > 0 ? `Added. ${n} day${n === 1 ? "" : "s"} to go` : "Added");
+    });
+  }
+
+  // ---------- wiring ----------
+  document.addEventListener("click", e => {
+    const c = e.target.closest(".card"); if (c) { const it = items.find(i => i.id === c.dataset.id); if (it) openSheet(it); return; }
+    const d = e.target.closest(".day"); if (d) {
+      const s = d.dataset.day;
+      if (s === selDay && !(items.some(i => i.date === s))) { openSheet(null, s); return; }
+      selDay = s; const p = parse(s); if (p.m !== calM) { calY = p.y; calM = p.m; } renderCal();
+    }
+  });
+  $("fab").onclick = () => openSheet(null, view === "cal" ? selDay : undefined);
+  $("tabHome").onclick = () => { view = "home"; setMeta("view", view); render(); };
+  $("tabCal").onclick = () => { view = "cal"; setMeta("view", view); render(); };
+  $("prevM").onclick = () => { calM--; if (calM < 0) { calM = 11; calY--; } renderCal(); };
+  $("nextM").onclick = () => { calM++; if (calM > 11) { calM = 0; calY++; } renderCal(); };
+  document.addEventListener("keydown", e => { if (e.key === "Escape") $("sheetRoot").innerHTML = ""; });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) render(); });
+
+  (async () => {
+    const now = new Date(); calY = now.getFullYear(); calM = now.getMonth();
+    if (getMeta("view") === "cal") view = "cal";
+    await openDB();
+    items = await loadAll();
+    if (!items.length && getMeta("seeded") !== "1") { await seedExamples(); setMeta("seeded", "1"); items = await loadAll(); }
+    const OLD = { "#f5ff3b": "#f7dd52", "#8fd3ff": "#02b5e9" };
+    for (const i of items) { if (OLD[i.color]) { i.color = OLD[i.color]; await save(i); } }
+    items.forEach(i => mem.set(i.id, i));
+    render();
+  })();
+})();
+</script>
+<script>
+if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {})); }
+</script>
+</body>
+</html>
