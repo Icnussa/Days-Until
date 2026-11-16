@@ -156,6 +156,7 @@ nav.tabs button[aria-current="page"] { color: var(--yellow); }
 .swatches { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .sw { width: 34px; height: 34px; border-radius: 50%; border: 2px solid transparent; padding: 0; }
 .sw[aria-pressed="true"] { border-color: var(--fg); box-shadow: 0 0 0 3px var(--bg) inset; }
+.sw-auto { background: conic-gradient(var(--blue) 0 50%, var(--yellow) 0 100%); color: var(--on-yellow); font-size: 10px; font-weight: 700; letter-spacing: .02em; }
 .sw-custom { position: relative; width: 34px; height: 34px; border-radius: 50%; overflow: hidden; border: 2px dashed var(--muted); display: grid; place-items: center; font-size: 18px; color: var(--muted); }
 .sw-custom input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
 .sw-custom.on { border-style: solid; border-color: var(--fg); }
@@ -350,7 +351,7 @@ nav.tabs button[aria-current="page"] { color: var(--yellow); }
     return `<button class="${cls}" data-id="${esc(it.id)}"${style}>
       <div class="meta"><div class="title">${esc(it.title)}</div>
         <div class="date"><span class="dot" style="background:${esc(it.color)}"></span>${prettyDate(it.date)}${it.example ? '<span class="example-tag">Example</span>' : ""}</div></div>
-      <div class="count"><div class="n">${big}</div><div class="u">${unit}</div></div>
+      <div class="count"><div class="n"${it.numColor && n >= 0 ? ` style="color:${esc(it.numColor)}"` : ""}>${big}</div><div class="u">${unit}</div></div>
     </button>`;
   }
 
@@ -407,6 +408,7 @@ nav.tabs button[aria-current="page"] { color: var(--yellow); }
   function openSheet(existing, presetDate) {
     const it = existing ? { ...existing } : { id: "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), title: "", date: presetDate || addDays(7), color: COLORS[0], bg: null };
     const isCustom = !COLORS.includes(it.color.toLowerCase());
+    const nCustom = !!it.numColor && !COLORS.includes(it.numColor.toLowerCase());
     $("sheetRoot").innerHTML = `<div class="scrim" id="scrim"><form class="sheet" id="form" role="dialog" aria-label="${existing ? "Edit countdown" : "Add countdown"}" novalidate>
       <div class="grabber"></div>
       <h2>${existing ? "Edit countdown" : "What are you waiting for?"}</h2>
@@ -418,6 +420,13 @@ nav.tabs button[aria-current="page"] { color: var(--yellow); }
           ${COLORS.map(c => `<button type="button" class="sw" data-c="${c}" style="background:${c}" aria-label="Colour ${c}" aria-pressed="${c === it.color.toLowerCase()}"></button>`).join("")}
           <label class="sw-custom ${isCustom ? "on" : ""}" id="swCustomWrap" title="Pick any colour" ${isCustom ? `style="background:${esc(it.color)}"` : ""}>${isCustom ? "" : "+"}<input type="color" id="fColor" value="${esc(isCustom ? it.color : "#f7dd52")}" aria-label="Pick any colour"></label>
         </div></div>
+      <div class="field"><span class="lbl">Number colour</span>
+        <div class="swatches" id="nsw">
+          <button type="button" class="sw sw-auto" data-c="" aria-label="Automatic: blue, or yellow when 7 days or less" aria-pressed="${!it.numColor}">Auto</button>
+          ${COLORS.map(c => `<button type="button" class="sw" data-c="${c}" style="background:${c}" aria-label="Colour ${c}" aria-pressed="${c === (it.numColor || "").toLowerCase()}"></button>`).join("")}
+          <label class="sw-custom ${nCustom ? "on" : ""}" id="nswCustomWrap" title="Pick any colour" ${nCustom ? `style="background:${esc(it.numColor)}"` : ""}>${nCustom ? "" : "+"}<input type="color" id="fNumColor" value="${esc(nCustom ? it.numColor : "#02b5e9")}" aria-label="Pick any colour for the number"></label>
+        </div>
+        <span class="note" id="nNote">${it.numColor ? "" : "Auto is blue, and turns yellow when it's 7 days away or less."}</span></div>
       <div class="field"><span class="lbl">Background photo</span>
         <div class="preview frame" id="pv" aria-label="Photo position. Drag to move it.">No photo yet</div>
         <div class="adjust" id="adjust" hidden>
@@ -456,6 +465,15 @@ nav.tabs button[aria-current="page"] { color: var(--yellow); }
     };
     $("sw").addEventListener("click", e => { const b = e.target.closest(".sw"); if (b) setColor(b.dataset.c); });
     $("fColor").addEventListener("input", e => setColor(e.target.value.toLowerCase()));
+    const setNum = c => {
+      it.numColor = c || null;
+      document.querySelectorAll("#nsw .sw").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.c === (c || ""))));
+      const w = $("nswCustomWrap"), custom = !!c && !COLORS.includes(c);
+      w.classList.toggle("on", custom); w.style.background = custom ? c : ""; w.firstChild.nodeValue = custom ? "" : "+";
+      $("nNote").textContent = c ? "" : "Auto is blue, and turns yellow when it's 7 days away or less.";
+    };
+    $("nsw").addEventListener("click", e => { const b = e.target.closest(".sw"); if (b) setNum(b.dataset.c); });
+    $("fNumColor").addEventListener("input", e => setNum(e.target.value.toLowerCase()));
 
     // ----- photo framing: drag to move, pinch or slider to zoom -----
     if (it.bg && !it.orig) it.orig = it.bg;           // older countdowns: their photo becomes the original
