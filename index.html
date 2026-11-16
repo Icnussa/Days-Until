@@ -146,7 +146,12 @@ nav.tabs button[aria-current="page"] { color: var(--yellow); }
 @keyframes up { from { transform: translateY(30px); opacity: .6; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .sheet { animation: none; } .card { transition: none; } }
 .grabber { width: 40px; height: 5px; border-radius: 99px; background: var(--line); margin: 0 auto 12px; }
-.sheet h2 { font-family: var(--display); font-size: 22px; margin: 0 0 14px; }
+.sheet-head {
+  position: sticky; top: -10px; z-index: 2; background: var(--surface);
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px;
+  margin: 0 0 12px; padding: 4px 0 12px; border-bottom: 1px solid var(--line);
+}
+.sheet h2 { font-family: var(--display); font-size: 19px; margin: 0; text-align: center; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
 .field > label, .field > .lbl { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .field input[type="text"], .field input[type="date"] {
@@ -411,7 +416,11 @@ nav.tabs button[aria-current="page"] { color: var(--yellow); }
     const nCustom = !!it.numColor && !COLORS.includes(it.numColor.toLowerCase());
     $("sheetRoot").innerHTML = `<div class="scrim" id="scrim"><form class="sheet" id="form" role="dialog" aria-label="${existing ? "Edit countdown" : "Add countdown"}" novalidate>
       <div class="grabber"></div>
-      <h2>${existing ? "Edit countdown" : "What are you waiting for?"}</h2>
+      <div class="sheet-head">
+        <button type="button" class="btn" id="cancel">Cancel</button>
+        <h2>${existing ? "Edit countdown" : "New countdown"}</h2>
+        <button type="submit" class="btn primary">${existing ? "Save" : "Add"}</button>
+      </div>
       <div class="field"><label for="fTitle">Name</label><input type="text" id="fTitle" maxlength="60" placeholder="e.g. Dune Part Three" value="${esc(it.title)}" autocomplete="off"></div>
       <div class="field"><label for="fDate">Date</label><input type="date" id="fDate" value="${esc(it.date)}"></div>
       <div class="err" id="fErr"></div>
@@ -446,10 +455,7 @@ nav.tabs button[aria-current="page"] { color: var(--yellow); }
         <label class="toggle" id="dimRow" for="fDim" ${it.bg ? "" : "hidden"}><span>Darken photo<br><span class="note">Makes the text easier to read on bright photos</span></span><input type="checkbox" id="fDim" ${it.dim ? "checked" : ""}><span class="track"></span></label>
         <span class="note" id="fileNote"></span>
       </div>
-      <div class="actions">
-        ${existing ? `<button type="button" class="btn danger" id="del">Delete</button>` : ""}
-        <div class="grow"><button type="button" class="btn" id="cancel">Cancel</button><button type="submit" class="btn primary">${existing ? "Save" : "Add countdown"}</button></div>
-      </div>
+      ${existing ? `<div class="actions"><button type="button" class="btn danger" id="del">Delete countdown</button></div>` : ""}
     </form></div>`;
 
     const close = () => $("sheetRoot").innerHTML = "";
