@@ -220,6 +220,7 @@ nav.tabs button[aria-current="page"] { color: var(--yellow); }
   <main id="pastView" hidden>
     <p class="view-intro" id="pastIntro"></p>
     <div class="list" id="pastList"></div>
+    <p class="note" style="text-align:center;margin-top:24px">Days Until · version 11</p>
   </main>
 
   <main id="calView" hidden>
@@ -425,6 +426,12 @@ nav.tabs button[aria-current="page"] { color: var(--yellow); }
     $("tabCal").setAttribute("aria-current", view === "cal" ? "page" : "false");
     $("tabPast").setAttribute("aria-current", view === "past" ? "page" : "false");
     if (view === "home") renderHome(); else if (view === "past") renderPast(); else renderCal();
+    settleScroll();
+  }
+  // iPhone positions the fixed bottom bar differently depending on whether the page has been scrolled.
+  // Nudge every page to the same just-scrolled state so the bar sits in the same place on all of them.
+  function settleScroll() {
+    requestAnimationFrame(() => { if (window.scrollY < 1) window.scrollTo(0, 1); });
   }
 
   function toast(msg) {
@@ -614,9 +621,10 @@ nav.tabs button[aria-current="page"] { color: var(--yellow); }
   });
   $("addBtn").onclick = () => openSheet(null);
   document.addEventListener("click", e => { if (e.target.closest("#addDayBtn")) openSheet(null, selDay); });
-  $("tabHome").onclick = () => { view = "home"; setMeta("view", view); render(); };
-  $("tabCal").onclick = () => { view = "cal"; setMeta("view", view); render(); };
-  $("tabPast").onclick = () => { view = "past"; setMeta("view", view); render(); };
+  const go = v => { view = v; setMeta("view", view); window.scrollTo(0, 0); render(); };
+  $("tabHome").onclick = () => go("home");
+  $("tabCal").onclick = () => go("cal");
+  $("tabPast").onclick = () => go("past");
   $("prevM").onclick = () => { calM--; if (calM < 0) { calM = 11; calY--; } renderCal(); };
   $("nextM").onclick = () => { calM++; if (calM > 11) { calM = 0; calY++; } renderCal(); };
   document.addEventListener("keydown", e => { if (e.key === "Escape") $("sheetRoot").innerHTML = ""; });
