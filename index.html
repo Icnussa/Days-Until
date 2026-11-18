@@ -51,7 +51,7 @@ button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 .app {
-  max-width: 560px; margin: 0 auto; min-height: 100%;
+  max-width: 560px; margin: 0 auto; min-height: calc(100% + 2px); /* always slightly scrollable, so iPhone Safari places the bottom bar the same on every page */
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: 8px calc(96px + env(safe-area-inset-bottom, 0px));
